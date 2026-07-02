@@ -54,11 +54,13 @@ def main():
                     if len(izrez_box) >0:
                         tx1,ty1,tx2,ty2 = [int(e) for e in izrez_box.xyxy[0]]
                         izrezRegisterske = izrez[ty1:ty2,tx1:tx2]
-                        branje_izreza = reader.readtext(izrezRegisterske)
+                        branje_izreza = reader.readtext(izrezRegisterske,allowlist="ABCDEFGHIJKLMNOPQRSTUWXY0123456789")
+                        
                         for detection in branje_izreza:
                             tekst = detection[1]
                             zaupanje = detection[2]
-                            print(f"tekst:{tekst}, zaupanje {zaupanje}")
+                            if zaupanje>=0.95 and len(tekst)==7:
+                                print(f"tekst:{tekst}, zaupanje {zaupanje}")
 
                         cv2.rectangle(trenutni_okvir,(x1+tx1,y1+ty1),(x1+tx2,y1+ty2),(255,0,0),2)
 
@@ -67,10 +69,10 @@ def main():
                     sirina_boxa = x2 - x1
                     sirina_slike = trenutni_okvir.shape[1]
 
-                    if sirina_boxa > sirina_slike * 0.3:
-                        print("dovolj je blizu")
-                    else :
-                        print("baustela")
+                    #if sirina_boxa > sirina_slike * 0.3:
+                    #    print("dovolj je bliz
+                    #else :
+                    #    print("ni dovolj blizu")
                         
                     #print(imeRazred)
             cv2.imshow("prikaz kamere",trenutni_okvir)
