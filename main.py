@@ -63,14 +63,15 @@ def main():
                             
                             for detection in branje_izreza:
                                 tekst = detection[1]
+                                tekst = tekst.replace(" ","")
                                 zaupanje = detection[2]
-                                if zaupanje>=0.95 and len(tekst)==7:
+                                if zaupanje>=0.80 and  7 >= len(tekst) >= 5:
                                     print(f"tekst:{tekst}, zaupanje {zaupanje}")
 
                             cv2.rectangle(trenutni_okvir,(x1+tx1,y1+ty1),(x1+tx2,y1+ty2),(255,0,0),2)
                         
-                    else :
-                        print("ni dovolj blizu")
+                    
+                    
             
                     cv2.rectangle(trenutni_okvir,(x1,y1),(x2,y2),(0,0,255),2)
 
