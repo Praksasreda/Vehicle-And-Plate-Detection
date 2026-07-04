@@ -30,6 +30,7 @@ def main():
     model = YOLO("yolov8n.pt")
     model_tablice = YOLO("license_plate_detector.pt")
     kamera1 = Kamera(1)
+
     reader = easyocr.Reader(['en'])
     time.sleep(1.0)
 
@@ -44,35 +45,38 @@ def main():
             for box in results[0].boxes:
                 razredId = int(box.cls[0])
                 imeRazred = model.names[razredId]
+                #prvo ce zazna kaksn avto potem pridobi kordniate tega okvirja
                 if razredId == 2:
                     x1,y1,x2,y2 = ([int(e) for e in (box.xyxy[0])])
-
-                    izrez = trenutni_okvir[y1:y2,x1:x2]
-                    #ta izrez je sedaj moja slika moj frame?
-                    izrez_results = model_tablice(izrez,verbose=False)
-                    izrez_box = izrez_results[0].boxes
-                    if len(izrez_box) >0:
-                        tx1,ty1,tx2,ty2 = [int(e) for e in izrez_box.xyxy[0]]
-                        izrezRegisterske = izrez[ty1:ty2,tx1:tx2]
-                        branje_izreza = reader.readtext(izrezRegisterske,allowlist="ABCDEFGHIJKLMNOPQRSTUWXY0123456789")
-                        
-                        for detection in branje_izreza:
-                            tekst = detection[1]
-                            zaupanje = detection[2]
-                            if zaupanje>=0.95 and len(tekst)==7:
-                                print(f"tekst:{tekst}, zaupanje {zaupanje}")
-
-                        cv2.rectangle(trenutni_okvir,(x1+tx1,y1+ty1),(x1+tx2,y1+ty2),(255,0,0),2)
-
-                    cv2.rectangle(trenutni_okvir,(x1,y1),(x2,y2),(0,0,255),2)
-
+                    #potem ce je avto dovolj blizu 
                     sirina_boxa = x2 - x1
                     sirina_slike = trenutni_okvir.shape[1]
 
-                    #if sirina_boxa > sirina_slike * 0.3:
-                    #    print("dovolj je bliz
-                    #else :
-                    #    print("ni dovolj blizu")
+                    if sirina_boxa > sirina_slike * 0.3:
+
+                        izrez = trenutni_okvir[y1:y2,x1:x2]
+                        izrez_results = model_tablice(izrez,verbose=False)
+                        izrez_box = izrez_results[0].boxes
+                        #potem ce je dejansko kaj prebralo
+                        if len(izrez_box) >0:
+                            tx1,ty1,tx2,ty2 = [int(e) for e in izrez_box.xyxy[0]]
+                            izrezRegisterske = izrez[ty1:ty2,tx1:tx2]
+                            branje_izreza = reader.readtext(izrezRegisterske,allowlist="ABCDEFGHIJKLMNOPQRSTVUWZXY0123456789")
+                            
+                            for detection in branje_izreza:
+                                tekst = detection[1]
+                                zaupanje = detection[2]
+                                #izpisi prebrano
+                                if zaupanje>=0.95 and len(tekst)==7:
+                                    print(f"tekst:{tekst}, zaupanje {zaupanje}")
+
+                            cv2.rectangle(trenutni_okvir,(x1+tx1,y1+ty1),(x1+tx2,y1+ty2),(255,0,0),2)
+                        
+                    else :
+                        print("ni dovolj blizu")
+            
+                    cv2.rectangle(trenutni_okvir,(x1,y1),(x2,y2),(0,0,255),2)
+
                         
                     #print(imeRazred)
             cv2.imshow("prikaz kamere",trenutni_okvir)
