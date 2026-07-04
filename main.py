@@ -26,6 +26,8 @@ class Kamera:
     def release(self):
         self.cap.release()
 
+
+
 def main():
     model = YOLO("yolov8n.pt")
     model_tablice = YOLO("license_plate_detector.pt")
@@ -40,15 +42,12 @@ def main():
         if trenutni_okvir is not None:
             results = model(trenutni_okvir,verbose = False)
             
-            #trenutni_okvir = cv2.rectangle(trenutni_okvir,)
             
             for box in results[0].boxes:
                 razredId = int(box.cls[0])
                 imeRazred = model.names[razredId]
-                #prvo ce zazna kaksn avto potem pridobi kordniate tega okvirja
                 if razredId == 2:
                     x1,y1,x2,y2 = ([int(e) for e in (box.xyxy[0])])
-                    #potem ce je avto dovolj blizu 
                     sirina_boxa = x2 - x1
                     sirina_slike = trenutni_okvir.shape[1]
 
@@ -57,7 +56,6 @@ def main():
                         izrez = trenutni_okvir[y1:y2,x1:x2]
                         izrez_results = model_tablice(izrez,verbose=False)
                         izrez_box = izrez_results[0].boxes
-                        #potem ce je dejansko kaj prebralo
                         if len(izrez_box) >0:
                             tx1,ty1,tx2,ty2 = [int(e) for e in izrez_box.xyxy[0]]
                             izrezRegisterske = izrez[ty1:ty2,tx1:tx2]
@@ -66,7 +64,6 @@ def main():
                             for detection in branje_izreza:
                                 tekst = detection[1]
                                 zaupanje = detection[2]
-                                #izpisi prebrano
                                 if zaupanje>=0.95 and len(tekst)==7:
                                     print(f"tekst:{tekst}, zaupanje {zaupanje}")
 
@@ -78,7 +75,6 @@ def main():
                     cv2.rectangle(trenutni_okvir,(x1,y1),(x2,y2),(0,0,255),2)
 
                         
-                    #print(imeRazred)
             cv2.imshow("prikaz kamere",trenutni_okvir)
         
             
