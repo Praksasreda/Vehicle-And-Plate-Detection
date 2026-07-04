@@ -3,6 +3,9 @@ import threading
 from ultralytics import YOLO
 import time
 import easyocr
+import numpy as np
+import sqlite3
+
 
 class Kamera:
     def __init__(self,index):
@@ -27,25 +30,14 @@ class Kamera:
         self.cap.release()
 
 
-
-def main():
-    model = YOLO("yolov8n.pt")
-    model_tablice = YOLO("license_plate_detector.pt")
-    kamera1 = Kamera(1)
-
-    reader = easyocr.Reader(['en'])
-    time.sleep(1.0)
-
-
-    while True:
-        trenutni_okvir = kamera1.frame
-        if trenutni_okvir is not None:
+def procesirajSliko(trenutni_okvir,model,model_tablice,reader,index,kazalec):
+    if trenutni_okvir is not None:
             results = model(trenutni_okvir,verbose = False)
-            
-            
+
             for box in results[0].boxes:
                 razredId = int(box.cls[0])
                 imeRazred = model.names[razredId]
+
                 if razredId == 2:
                     x1,y1,x2,y2 = ([int(e) for e in (box.xyxy[0])])
                     sirina_boxa = x2 - x1
@@ -56,6 +48,7 @@ def main():
                         izrez = trenutni_okvir[y1:y2,x1:x2]
                         izrez_results = model_tablice(izrez,verbose=False)
                         izrez_box = izrez_results[0].boxes
+
                         if len(izrez_box) >0:
                             tx1,ty1,tx2,ty2 = [int(e) for e in izrez_box.xyxy[0]]
                             izrezRegisterske = izrez[ty1:ty2,tx1:tx2]
@@ -65,30 +58,92 @@ def main():
                                 tekst = detection[1]
                                 tekst = tekst.replace(" ","")
                                 zaupanje = detection[2]
-                                if zaupanje>=0.80 and  7 >= len(tekst) >= 5:
-                                    print(f"tekst:{tekst}, zaupanje {zaupanje}")
 
+                                if zaupanje>=0.90 and  7 == len(tekst):
+                                    print(f"tekst:{tekst}, zaupanje {zaupanje}")
+                                    cv2.putText(trenutni_okvir,tekst,(x1+tx1,y1+ty1+1),cv2.FONT_HERSHEY_COMPLEX_SMALL,1,(255,0,0),2,cv2.LINE_AA)
+                                    kazalec.execute("INSERT INTO zaznave (tablica,zaupanje,kamera) VALUES (?,?,?)",(tekst,zaupanje,index))
+
+                            #ta okvir je za registersko        
                             cv2.rectangle(trenutni_okvir,(x1+tx1,y1+ty1),(x1+tx2,y1+ty2),(255,0,0),2)
-                        
                     
-                    
-            
+                    #ta okvir je za zaznan avto
                     cv2.rectangle(trenutni_okvir,(x1,y1),(x2,y2),(0,0,255),2)
 
-                        
-            cv2.imshow("prikaz kamere",trenutni_okvir)
-        
-            
+            cv2.imshow(f"prikaz kamere {index}",trenutni_okvir)
 
+def dashboard(frames:list):
+    #drugacen pristop potreben
+    h,w = 360,640
+    urejeniOkvirji = [cv2.resize(f,(w,h)) for f in frames]
+
+    while len(frames)<4:
+        urejeniOkvirji.append(np.zeros((h,w,3),dtype=np.uint8))
+
+    vrsta1  = np.hstack([urejeniOkvirji[0],urejeniOkvirji[1]])            
+    vrsta2  = np.hstack([urejeniOkvirji[2],urejeniOkvirji[3]])
+    grid = np.vstack([vrsta1,vrsta2])
+
+    cv2.imshow("dashboard",grid)
+
+
+def najdiKamere(max_index=5)->list:
+    camArr = []
+    for i in range(max_index):
+        cap = cv2.VideoCapture(i)
+        if cap.isOpened():
+            camArr.append(i)
+            cap.release()
+        else:
+            cap.release()
+
+    return camArr
+
+
+
+
+def main():
+    model = YOLO("yolov8n.pt")
+    model_tablice = YOLO("license_plate_detector.pt")
+    aktivneKamere = [Kamera(i) for i in najdiKamere()]
+    reader = easyocr.Reader(['en'])
+    povezava = sqlite3.connect("baza.db")
+    kazalec = povezava.cursor()
+    kazalec.execute("""
+        CREATE TABLE if not exists zaznave(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tablica TEXT,
+                    zaupanje REAL,
+                    kamera INTEGER,
+                    cas TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+    """)
+
+    time.sleep(1.0)
+
+
+    while True:
+        for index in range(len(aktivneKamere)):
+            trenutni_okvir = aktivneKamere[index].frame
+            procesirajSliko(trenutni_okvir,model,model_tablice,reader,index,kazalec)
+            
 
 
         if cv2.waitKey(1) & 0xFF == ord("q"):
+            povezava.commit()
             break
         
     
     print("zapiram kamero")
-    kamera1.release()
+    for kamera in aktivneKamere:
+        kamera.release()
     cv2.destroyAllWindows()
+    kazalec.execute("SELECT * FROM zaznave")
+    rezultati = kazalec.fetchall()
+
+    for vnos in rezultati:
+        print(f"id : {vnos[0]}, tablica : {vnos[1]}, zaupanje : {vnos[2]}, kamera : {vnos[3]}, cas : {vnos[4]}")
+
 
 
 if __name__ == "__main__":

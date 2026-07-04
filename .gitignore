@@ -2,3 +2,5 @@ venv/
 *.pt
 .env
 __pycache__/
+baza.db
+izpis.py
